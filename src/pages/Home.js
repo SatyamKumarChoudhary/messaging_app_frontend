@@ -65,20 +65,67 @@ function Home() {
     navigate('/login');
   };
 
+  // Phone input formatter (auto-adds +91 prefix)
+  const handleReceiverChange = (e) => {
+    let value = e.target.value;
+    
+    // Remove all non-digit characters
+    value = value.replace(/\D/g, '');
+    
+    // Auto-add +91 prefix if user starts typing
+    if (value.length > 0 && !value.startsWith('91')) {
+      value = '91' + value;
+    }
+    
+    // Limit to 12 digits (91 + 10 digits)
+    if (value.length > 12) {
+      value = value.slice(0, 12);
+    }
+    
+    // Add + prefix for display
+    const formattedValue = value.length > 0 ? '+' + value : '';
+    
+    setReceiver(formattedValue);
+  };
+
   const handleSendMessage = async (e) => {
     e.preventDefault();
     setError('');
     setSuccess('');
     setLoading(true);
 
+    // Validate phone format
+    const phoneRegex = /^\+91[6-9]\d{9}$/;
+    if (!phoneRegex.test(receiver)) {
+      setError('Invalid phone number. Must be 10 digits starting with 6-9');
+      setLoading(false);
+      return;
+    }
+
+    // Prevent sending to self
+    if (receiver === user.phone) {
+      setError('Cannot send message to yourself');
+      setLoading(false);
+      return;
+    }
+
     try {
-      await axios.post(
+      const response = await axios.post(
         'http://localhost:3001/api/messages/send',
-        { receiver_username: receiver, text: message },
+        { receiver_phone: receiver, text: message },
         { headers: { 'Authorization': `Bearer ${token}` } }
       );
 
-      setSuccess('Message sent!');
+      // Show appropriate success message
+      if (response.data.receiver_status === 'unregistered') {
+        setSuccess(`Message sent! ${receiver} will receive it when they register.`);
+      } else {
+        setSuccess(response.data.delivered 
+          ? 'Message sent and delivered!' 
+          : 'Message sent! User will receive when online.'
+        );
+      }
+
       setReceiver('');
       setMessage('');
     } catch (err) {
@@ -103,7 +150,10 @@ function Home() {
     <div style={styles.container}>
       {/* Header */}
       <div style={styles.header}>
-        <h1 style={styles.title}>📨 Welcome, {user.username}!</h1>
+        <div>
+          <h1 style={styles.title}>📨 Welcome, {user.username || user.phone}!</h1>
+          <p style={styles.userPhone}>Your number: {user.phone}</p>
+        </div>
         <button onClick={handleLogout} style={styles.logoutBtn}>
           Logout
         </button>
@@ -113,14 +163,21 @@ function Home() {
       <div style={styles.card}>
         <h2 style={styles.sectionTitle}>📤 Send Message</h2>
         <form onSubmit={handleSendMessage} style={styles.form}>
-          <input
-            type="text"
-            placeholder="Receiver username"
-            value={receiver}
-            onChange={(e) => setReceiver(e.target.value)}
-            required
-            style={styles.input}
-          />
+          <div style={styles.inputGroup}>
+            <label style={styles.label}>Receiver's Phone Number</label>
+            <input
+              type="tel"
+              placeholder="+919876543210"
+              value={receiver}
+              onChange={handleReceiverChange}
+              required
+              style={styles.input}
+              maxLength="13"
+            />
+            <small style={styles.hint}>
+              Works even if they haven't registered yet!
+            </small>
+          </div>
           <textarea
             placeholder="Type your message..."
             value={message}
@@ -148,56 +205,49 @@ function Home() {
         ) : (
           <div style={styles.chatList}>
             {messages.map((msg) => (
-              <div key={msg.message_id} style={styles.chatItem}>
+              <div key={msg.message_id} style={styles.chatItem} onClick={() => openMessageViewer(msg)}>
                 <div style={styles.chatInfo}>
                   <div style={styles.avatar}>
-                    {msg.sender_name.charAt(0).toUpperCase()}
+                    {(msg.sender_name || msg.sender_phone).charAt(0).toUpperCase()}
                   </div>
                   <div style={styles.chatDetails}>
-                    <div style={styles.senderName}>{msg.sender_name}</div>
+                    <div style={styles.senderName}>
+                      {msg.sender_name || msg.sender_phone}
+                    </div>
+                    <div style={styles.senderPhone}>
+                      {msg.sender_phone}
+                    </div>
                     <div style={styles.messagePreview}>
                       {msg.text.substring(0, 30)}
                       {msg.text.length > 30 ? '...' : ''}
                     </div>
                   </div>
                 </div>
-                <button 
-                  onClick={() => openMessageViewer(msg)}
-                  style={styles.viewBtn}
-                >
-                  View
-                </button>
+                <div style={styles.viewBtn}>👁️ View</div>
               </div>
             ))}
           </div>
         )}
       </div>
 
-      {/* Message Viewer Modal */}
+      {/* Message Viewer Modal (15-second self-destruct) */}
       {viewingMessage && (
-        <div style={styles.modalOverlay} onClick={closeMessageViewer}>
-          <div style={styles.modal} onClick={(e) => e.stopPropagation()}>
+        <div style={styles.modal} onClick={closeMessageViewer}>
+          <div style={styles.modalContent} onClick={(e) => e.stopPropagation()}>
             <div style={styles.modalHeader}>
               <h3 style={styles.modalTitle}>
-                From: {viewingMessage.sender_name}
+                From: {viewingMessage.sender_name || viewingMessage.sender_phone}
               </h3>
               <div style={styles.countdown}>
                 ⏱️ {countdown}s
               </div>
             </div>
-            
-            <div style={styles.modalBody}>
-              <p style={styles.messageText}>{viewingMessage.text}</p>
+            <p style={styles.modalPhone}>{viewingMessage.sender_phone}</p>
+            <div style={styles.messageBody}>
+              {viewingMessage.text}
             </div>
-            
-            <div style={styles.modalFooter}>
-              <small style={styles.messageTime}>
-                {new Date(viewingMessage.created_at).toLocaleString()}
-              </small>
-            </div>
-            
             <button onClick={closeMessageViewer} style={styles.closeBtn}>
-              Close
+              Close Now
             </button>
           </div>
         </div>
@@ -210,19 +260,27 @@ const styles = {
   container: {
     minHeight: '100vh',
     backgroundColor: '#f0f2f5',
-    padding: '20px',
-    fontFamily: 'Arial, sans-serif'
+    fontFamily: 'Arial, sans-serif',
+    padding: '20px'
   },
   header: {
     display: 'flex',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: '30px'
+    backgroundColor: 'white',
+    padding: '20px',
+    borderRadius: '10px',
+    marginBottom: '20px',
+    boxShadow: '0 2px 5px rgba(0,0,0,0.1)'
   },
   title: {
-    color: '#333',
-    fontSize: '24px',
-    margin: 0
+    margin: 0,
+    color: '#333'
+  },
+  userPhone: {
+    margin: '5px 0 0 0',
+    fontSize: '14px',
+    color: '#666'
   },
   logoutBtn: {
     padding: '10px 20px',
@@ -235,56 +293,69 @@ const styles = {
   },
   card: {
     backgroundColor: 'white',
-    padding: '25px',
+    padding: '20px',
     borderRadius: '10px',
-    boxShadow: '0 2px 8px rgba(0,0,0,0.1)',
-    marginBottom: '20px',
-    maxWidth: '600px',
-    margin: '0 auto 20px'
+    boxShadow: '0 2px 5px rgba(0,0,0,0.1)',
+    marginBottom: '20px'
   },
   sectionTitle: {
-    color: '#333',
-    marginBottom: '20px',
-    fontSize: '18px'
+    marginTop: 0,
+    color: '#333'
   },
   form: {
     display: 'flex',
     flexDirection: 'column',
-    gap: '12px'
+    gap: '15px'
+  },
+  inputGroup: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '5px'
+  },
+  label: {
+    fontSize: '14px',
+    fontWeight: '600',
+    color: '#555'
   },
   input: {
     padding: '12px',
     fontSize: '16px',
     border: '1px solid #ddd',
-    borderRadius: '5px'
+    borderRadius: '5px',
+    outline: 'none'
+  },
+  hint: {
+    fontSize: '12px',
+    color: '#888',
+    marginTop: '2px'
   },
   textarea: {
     padding: '12px',
     fontSize: '16px',
     border: '1px solid #ddd',
     borderRadius: '5px',
-    fontFamily: 'Arial',
+    outline: 'none',
     resize: 'vertical'
   },
   sendBtn: {
     padding: '12px',
+    fontSize: '16px',
     backgroundColor: '#007bff',
     color: 'white',
     border: 'none',
     borderRadius: '5px',
     cursor: 'pointer',
-    fontWeight: 'bold',
-    fontSize: '16px'
+    fontWeight: 'bold'
   },
   error: {
     color: 'red',
     fontSize: '14px',
-    margin: 0
+    textAlign: 'center'
   },
   success: {
     color: 'green',
     fontSize: '14px',
-    margin: 0
+    textAlign: 'center'
   },
   noMessages: {
     textAlign: 'center',
@@ -303,17 +374,18 @@ const styles = {
     padding: '15px',
     backgroundColor: '#f8f9fa',
     borderRadius: '8px',
-    border: '1px solid #e9ecef'
+    cursor: 'pointer',
+    transition: 'background-color 0.2s'
   },
   chatInfo: {
     display: 'flex',
+    gap: '15px',
     alignItems: 'center',
-    gap: '12px',
     flex: 1
   },
   avatar: {
-    width: '45px',
-    height: '45px',
+    width: '50px',
+    height: '50px',
     borderRadius: '50%',
     backgroundColor: '#007bff',
     color: 'white',
@@ -329,87 +401,80 @@ const styles = {
   senderName: {
     fontWeight: 'bold',
     fontSize: '16px',
-    color: '#333',
-    marginBottom: '4px'
+    color: '#333'
+  },
+  senderPhone: {
+    fontSize: '12px',
+    color: '#666',
+    marginTop: '2px'
   },
   messagePreview: {
+    fontSize: '14px',
     color: '#666',
-    fontSize: '14px'
+    marginTop: '5px'
   },
   viewBtn: {
-    padding: '8px 20px',
-    backgroundColor: '#28a745',
+    padding: '8px 15px',
+    backgroundColor: '#007bff',
     color: 'white',
-    border: 'none',
     borderRadius: '5px',
-    cursor: 'pointer',
-    fontWeight: 'bold'
+    fontSize: '14px'
   },
-  modalOverlay: {
+  modal: {
     position: 'fixed',
     top: 0,
     left: 0,
     right: 0,
     bottom: 0,
-    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    backgroundColor: 'rgba(0,0,0,0.7)',
     display: 'flex',
-    alignItems: 'center',
     justifyContent: 'center',
+    alignItems: 'center',
     zIndex: 1000
   },
-  modal: {
+  modalContent: {
     backgroundColor: 'white',
-    borderRadius: '12px',
-    width: '90%',
+    padding: '30px',
+    borderRadius: '10px',
     maxWidth: '500px',
-    padding: '25px',
-    boxShadow: '0 4px 20px rgba(0,0,0,0.3)'
+    width: '90%',
+    maxHeight: '80vh',
+    overflow: 'auto'
   },
   modalHeader: {
     display: 'flex',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: '20px',
-    paddingBottom: '15px',
-    borderBottom: '2px solid #e9ecef'
+    marginBottom: '10px'
   },
   modalTitle: {
     margin: 0,
-    fontSize: '20px',
     color: '#333'
   },
+  modalPhone: {
+    fontSize: '14px',
+    color: '#666',
+    marginBottom: '20px'
+  },
   countdown: {
-    fontSize: '20px',
+    fontSize: '24px',
     fontWeight: 'bold',
-    color: '#dc3545',
-    backgroundColor: '#ffe6e6',
-    padding: '8px 15px',
-    borderRadius: '20px'
+    color: '#dc3545'
   },
-  modalBody: {
-    padding: '20px 0',
-    minHeight: '100px'
-  },
-  messageText: {
+  messageBody: {
     fontSize: '18px',
     lineHeight: '1.6',
     color: '#333',
-    margin: 0,
-    wordBreak: 'break-word'
-  },
-  modalFooter: {
-    paddingTop: '15px',
-    borderTop: '1px solid #e9ecef',
-    marginBottom: '15px'
-  },
-  messageTime: {
-    color: '#999',
-    fontSize: '12px'
+    padding: '20px',
+    backgroundColor: '#f8f9fa',
+    borderRadius: '8px',
+    marginBottom: '20px',
+    minHeight: '100px'
   },
   closeBtn: {
     width: '100%',
     padding: '12px',
-    backgroundColor: '#6c757d',
+    backgroundColor: '#dc3545',
     color: 'white',
     border: 'none',
     borderRadius: '5px',

@@ -4,7 +4,7 @@ import axios from 'axios';
 
 function Login() {
   const [formData, setFormData] = useState({
-    username: '',
+    phone: '',
     password: ''
   });
   const [error, setError] = useState('');
@@ -18,13 +18,50 @@ function Login() {
     });
   };
 
+  // Phone input formatter (auto-adds +91 prefix)
+  const handlePhoneChange = (e) => {
+    let value = e.target.value;
+    
+    // Remove all non-digit characters
+    value = value.replace(/\D/g, '');
+    
+    // Auto-add +91 prefix if user starts typing
+    if (value.length > 0 && !value.startsWith('91')) {
+      value = '91' + value;
+    }
+    
+    // Limit to 12 digits (91 + 10 digits)
+    if (value.length > 12) {
+      value = value.slice(0, 12);
+    }
+    
+    // Add + prefix for display
+    const formattedValue = value.length > 0 ? '+' + value : '';
+    
+    setFormData({
+      ...formData,
+      phone: formattedValue
+    });
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
     setLoading(true);
 
+    // Validate phone format
+    const phoneRegex = /^\+91[6-9]\d{9}$/;
+    if (!phoneRegex.test(formData.phone)) {
+      setError('Invalid phone number. Must be 10 digits starting with 6-9');
+      setLoading(false);
+      return;
+    }
+
     try {
-      const response = await axios.post('http://localhost:3001/api/auth/login', formData);
+      const response = await axios.post('http://localhost:3001/api/auth/login', {
+        phone: formData.phone,
+        password: formData.password
+      });
       
       // Store token in localStorage
       localStorage.setItem('token', response.data.token);
@@ -45,25 +82,35 @@ function Login() {
         <h1 style={styles.title}>📨 Snap - Login</h1>
         
         <form onSubmit={handleSubmit} style={styles.form}>
-          <input
-            type="text"
-            name="username"
-            placeholder="Username"
-            value={formData.username}
-            onChange={handleChange}
-            required
-            style={styles.input}
-          />
+          <div style={styles.inputGroup}>
+            <label style={styles.label}>Phone Number</label>
+            <input
+              type="tel"
+              name="phone"
+              placeholder="+919876543210"
+              value={formData.phone}
+              onChange={handlePhoneChange}
+              required
+              style={styles.input}
+              maxLength="13"
+            />
+            <small style={styles.hint}>
+              Format: +91 followed by 10 digits
+            </small>
+          </div>
           
-          <input
-            type="password"
-            name="password"
-            placeholder="Password"
-            value={formData.password}
-            onChange={handleChange}
-            required
-            style={styles.input}
-          />
+          <div style={styles.inputGroup}>
+            <label style={styles.label}>Password</label>
+            <input
+              type="password"
+              name="password"
+              placeholder="Enter your password"
+              value={formData.password}
+              onChange={handleChange}
+              required
+              style={styles.input}
+            />
+          </div>
           
           {error && <p style={styles.error}>{error}</p>}
           
@@ -107,12 +154,27 @@ const styles = {
     flexDirection: 'column',
     gap: '15px'
   },
+  inputGroup: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '5px'
+  },
+  label: {
+    fontSize: '14px',
+    fontWeight: '600',
+    color: '#555'
+  },
   input: {
     padding: '12px',
     fontSize: '16px',
     border: '1px solid #ddd',
     borderRadius: '5px',
     outline: 'none'
+  },
+  hint: {
+    fontSize: '12px',
+    color: '#888',
+    marginTop: '2px'
   },
   button: {
     padding: '12px',
@@ -122,12 +184,14 @@ const styles = {
     border: 'none',
     borderRadius: '5px',
     cursor: 'pointer',
-    fontWeight: 'bold'
+    fontWeight: 'bold',
+    marginTop: '10px'
   },
   error: {
     color: 'red',
     fontSize: '14px',
-    textAlign: 'center'
+    textAlign: 'center',
+    margin: '10px 0'
   },
   link: {
     textAlign: 'center',

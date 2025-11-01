@@ -65,67 +65,20 @@ function Home() {
     navigate('/login');
   };
 
-  // Phone input formatter (auto-adds +91 prefix)
-  const handleReceiverChange = (e) => {
-    let value = e.target.value;
-    
-    // Remove all non-digit characters
-    value = value.replace(/\D/g, '');
-    
-    // Auto-add +91 prefix if user starts typing
-    if (value.length > 0 && !value.startsWith('91')) {
-      value = '91' + value;
-    }
-    
-    // Limit to 12 digits (91 + 10 digits)
-    if (value.length > 12) {
-      value = value.slice(0, 12);
-    }
-    
-    // Add + prefix for display
-    const formattedValue = value.length > 0 ? '+' + value : '';
-    
-    setReceiver(formattedValue);
-  };
-
   const handleSendMessage = async (e) => {
     e.preventDefault();
     setError('');
     setSuccess('');
     setLoading(true);
 
-    // Validate phone format
-    const phoneRegex = /^\+91[6-9]\d{9}$/;
-    if (!phoneRegex.test(receiver)) {
-      setError('Invalid phone number. Must be 10 digits starting with 6-9');
-      setLoading(false);
-      return;
-    }
-
-    // Prevent sending to self
-    if (receiver === user.phone) {
-      setError('Cannot send message to yourself');
-      setLoading(false);
-      return;
-    }
-
     try {
-      const response = await axios.post(
+      await axios.post(
         'http://localhost:3001/api/messages/send',
-        { receiver_phone: receiver, text: message },
+        { receiver_username: receiver, text: message },
         { headers: { 'Authorization': `Bearer ${token}` } }
       );
 
-      // Show appropriate success message
-      if (response.data.receiver_status === 'unregistered') {
-        setSuccess(`Message sent! ${receiver} will receive it when they register.`);
-      } else {
-        setSuccess(response.data.delivered 
-          ? 'Message sent and delivered!' 
-          : 'Message sent! User will receive when online.'
-        );
-      }
-
+      setSuccess('Message sent!');
       setReceiver('');
       setMessage('');
     } catch (err) {
@@ -146,14 +99,107 @@ function Home() {
     }
   };
 
+  // Helper function to get message preview based on type
+  const getMessagePreview = (msg) => {
+    if (msg.message_type === 'image') {
+      return '📷 Image';
+    } else if (msg.message_type === 'video') {
+      return '🎥 Video';
+    } else if (msg.message_type === 'audio' || msg.message_type === 'voice') {
+      return '🎵 Audio';
+    } else if (msg.message_type === 'file') {
+      return `📎 ${msg.file_name || 'File'}`;
+    } else if (msg.text) {
+      return msg.text.substring(0, 30) + (msg.text.length > 30 ? '...' : '');
+    }
+    return 'New message';
+  };
+
+  // Helper function to render media content in modal
+  const renderMediaContent = (msg) => {
+    // If it's an image
+    if (msg.message_type === 'image' && msg.media_url) {
+      return (
+        <div style={styles.mediaContainer}>
+          <img 
+            src={msg.media_url} 
+            alt="Shared image" 
+            style={styles.image}
+          />
+          {msg.text && <p style={styles.mediaCaption}>{msg.text}</p>}
+        </div>
+      );
+    }
+    
+    // If it's a video
+    if (msg.message_type === 'video' && msg.media_url) {
+      return (
+        <div style={styles.mediaContainer}>
+          <video 
+            src={msg.media_url} 
+            controls 
+            style={styles.video}
+          >
+            Your browser does not support video playback.
+          </video>
+          {msg.text && <p style={styles.mediaCaption}>{msg.text}</p>}
+        </div>
+      );
+    }
+    
+    // If it's audio/voice
+    if ((msg.message_type === 'audio' || msg.message_type === 'voice') && msg.media_url) {
+      return (
+        <div style={styles.mediaContainer}>
+          <audio 
+            src={msg.media_url} 
+            controls 
+            style={styles.audio}
+          >
+            Your browser does not support audio playback.
+          </audio>
+          {msg.text && <p style={styles.mediaCaption}>{msg.text}</p>}
+        </div>
+      );
+    }
+    
+    // If it's a file (PDF, DOC, etc)
+    if (msg.message_type === 'file' && msg.media_url) {
+      return (
+        <div style={styles.mediaContainer}>
+          <div style={styles.fileInfo}>
+            <span style={styles.fileIcon}>📎</span>
+            <div>
+              <div style={styles.fileName}>{msg.file_name || 'Download File'}</div>
+              {msg.file_size && (
+                <div style={styles.fileSize}>
+                  {(msg.file_size / 1024).toFixed(2)} KB
+                </div>
+              )}
+            </div>
+          </div>
+          <a 
+            href={msg.media_url} 
+            target="_blank" 
+            rel="noopener noreferrer"
+            style={styles.downloadBtn}
+          >
+            View/Download File
+          </a>
+          {msg.text && <p style={styles.mediaCaption}>{msg.text}</p>}
+        </div>
+      );
+    }
+    
+    // Default: just text message
+    return <p style={styles.messageText}>{msg.text}</p>;
+  };
+
   return (
     <div style={styles.container}>
       {/* Header */}
       <div style={styles.header}>
-        <div>
-          <h1 style={styles.title}>📨 Welcome, {user.username || user.phone}!</h1>
-          <p style={styles.userPhone}>Your number: {user.phone}</p>
-        </div>
+        <h1 style={styles.title}>📨 Welcome, {user.username}!</h1>
         <button onClick={handleLogout} style={styles.logoutBtn}>
           Logout
         </button>
@@ -163,21 +209,14 @@ function Home() {
       <div style={styles.card}>
         <h2 style={styles.sectionTitle}>📤 Send Message</h2>
         <form onSubmit={handleSendMessage} style={styles.form}>
-          <div style={styles.inputGroup}>
-            <label style={styles.label}>Receiver's Phone Number</label>
-            <input
-              type="tel"
-              placeholder="+919876543210"
-              value={receiver}
-              onChange={handleReceiverChange}
-              required
-              style={styles.input}
-              maxLength="13"
-            />
-            <small style={styles.hint}>
-              Works even if they haven't registered yet!
-            </small>
-          </div>
+          <input
+            type="text"
+            placeholder="Receiver username"
+            value={receiver}
+            onChange={(e) => setReceiver(e.target.value)}
+            required
+            style={styles.input}
+          />
           <textarea
             placeholder="Type your message..."
             value={message}
@@ -205,47 +244,53 @@ function Home() {
         ) : (
           <div style={styles.chatList}>
             {messages.map((msg) => (
-              <div key={msg.message_id} style={styles.chatItem} onClick={() => openMessageViewer(msg)}>
+              <div key={msg.message_id} style={styles.chatItem}>
                 <div style={styles.chatInfo}>
                   <div style={styles.avatar}>
-                    {(msg.sender_name || msg.sender_phone).charAt(0).toUpperCase()}
+                    {msg.sender_name.charAt(0).toUpperCase()}
                   </div>
                   <div style={styles.chatDetails}>
-                    <div style={styles.senderName}>
-                      {msg.sender_name || msg.sender_phone}
-                    </div>
-                    <div style={styles.senderPhone}>
-                      {msg.sender_phone}
-                    </div>
+                    <div style={styles.senderName}>{msg.sender_name}</div>
                     <div style={styles.messagePreview}>
-                      {msg.text.substring(0, 30)}
-                      {msg.text.length > 30 ? '...' : ''}
+                      {getMessagePreview(msg)}
                     </div>
                   </div>
                 </div>
-                <div style={styles.viewBtn}>👁️ View</div>
+                <button 
+                  onClick={() => openMessageViewer(msg)}
+                  style={styles.viewBtn}
+                >
+                  View
+                </button>
               </div>
             ))}
           </div>
         )}
       </div>
 
-      {/* Message Viewer Modal (15-second self-destruct) */}
+      {/* Message Viewer Modal */}
       {viewingMessage && (
-        <div style={styles.modal} onClick={closeMessageViewer}>
-          <div style={styles.modalContent} onClick={(e) => e.stopPropagation()}>
+        <div style={styles.modalOverlay} onClick={closeMessageViewer}>
+          <div style={styles.modal} onClick={(e) => e.stopPropagation()}>
             <div style={styles.modalHeader}>
               <h3 style={styles.modalTitle}>
-                From: {viewingMessage.sender_name || viewingMessage.sender_phone}
+                From: {viewingMessage.sender_name}
               </h3>
               <div style={styles.countdown}>
                 ⏱️ {countdown}s
               </div>
             </div>
-            <p style={styles.modalPhone}>{viewingMessage.sender_phone}</p>
-            <div style={styles.messageBody}>
-              {viewingMessage.text}
+            
+            <div style={styles.modalBody}>
+              {renderMediaContent(viewingMessage)}
             </div>
+            
+            <div style={styles.modalFooter}>
+              <small style={styles.messageTime}>
+                {viewingMessage.sender_phone || ''}
+              </small>
+            </div>
+            
             <button onClick={closeMessageViewer} style={styles.closeBtn}>
               Close Now
             </button>
@@ -260,27 +305,19 @@ const styles = {
   container: {
     minHeight: '100vh',
     backgroundColor: '#f0f2f5',
-    fontFamily: 'Arial, sans-serif',
-    padding: '20px'
+    padding: '20px',
+    fontFamily: 'Arial, sans-serif'
   },
   header: {
     display: 'flex',
     justifyContent: 'space-between',
     alignItems: 'center',
-    backgroundColor: 'white',
-    padding: '20px',
-    borderRadius: '10px',
-    marginBottom: '20px',
-    boxShadow: '0 2px 5px rgba(0,0,0,0.1)'
+    marginBottom: '30px'
   },
   title: {
-    margin: 0,
-    color: '#333'
-  },
-  userPhone: {
-    margin: '5px 0 0 0',
-    fontSize: '14px',
-    color: '#666'
+    color: '#333',
+    fontSize: '24px',
+    margin: 0
   },
   logoutBtn: {
     padding: '10px 20px',
@@ -289,77 +326,62 @@ const styles = {
     border: 'none',
     borderRadius: '5px',
     cursor: 'pointer',
-    fontWeight: 'bold'
+    fontSize: '14px'
   },
   card: {
     backgroundColor: 'white',
-    padding: '20px',
     borderRadius: '10px',
-    boxShadow: '0 2px 5px rgba(0,0,0,0.1)',
-    marginBottom: '20px'
+    padding: '20px',
+    marginBottom: '20px',
+    boxShadow: '0 2px 8px rgba(0,0,0,0.1)'
   },
   sectionTitle: {
-    marginTop: 0,
+    fontSize: '20px',
+    marginBottom: '15px',
     color: '#333'
   },
   form: {
     display: 'flex',
     flexDirection: 'column',
-    gap: '15px'
-  },
-  inputGroup: {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: '5px'
-  },
-  label: {
-    fontSize: '14px',
-    fontWeight: '600',
-    color: '#555'
+    gap: '10px'
   },
   input: {
     padding: '12px',
-    fontSize: '16px',
     border: '1px solid #ddd',
     borderRadius: '5px',
-    outline: 'none'
-  },
-  hint: {
-    fontSize: '12px',
-    color: '#888',
-    marginTop: '2px'
+    fontSize: '14px'
   },
   textarea: {
     padding: '12px',
-    fontSize: '16px',
     border: '1px solid #ddd',
     borderRadius: '5px',
-    outline: 'none',
-    resize: 'vertical'
+    fontSize: '14px',
+    resize: 'vertical',
+    fontFamily: 'Arial, sans-serif'
+  },
+  error: {
+    color: '#dc3545',
+    margin: 0,
+    fontSize: '14px'
+  },
+  success: {
+    color: '#28a745',
+    margin: 0,
+    fontSize: '14px'
   },
   sendBtn: {
     padding: '12px',
-    fontSize: '16px',
     backgroundColor: '#007bff',
     color: 'white',
     border: 'none',
     borderRadius: '5px',
     cursor: 'pointer',
+    fontSize: '16px',
     fontWeight: 'bold'
-  },
-  error: {
-    color: 'red',
-    fontSize: '14px',
-    textAlign: 'center'
-  },
-  success: {
-    color: 'green',
-    fontSize: '14px',
-    textAlign: 'center'
   },
   noMessages: {
     textAlign: 'center',
-    color: '#999',
+    color: '#666',
     padding: '20px'
   },
   chatList: {
@@ -379,20 +401,20 @@ const styles = {
   },
   chatInfo: {
     display: 'flex',
-    gap: '15px',
     alignItems: 'center',
+    gap: '12px',
     flex: 1
   },
   avatar: {
-    width: '50px',
-    height: '50px',
+    width: '45px',
+    height: '45px',
     borderRadius: '50%',
     backgroundColor: '#007bff',
     color: 'white',
     display: 'flex',
     alignItems: 'center',
     justifyContent: 'center',
-    fontSize: '20px',
+    fontSize: '18px',
     fontWeight: 'bold'
   },
   chatDetails: {
@@ -401,26 +423,23 @@ const styles = {
   senderName: {
     fontWeight: 'bold',
     fontSize: '16px',
+    marginBottom: '4px',
     color: '#333'
   },
-  senderPhone: {
-    fontSize: '12px',
-    color: '#666',
-    marginTop: '2px'
-  },
   messagePreview: {
-    fontSize: '14px',
     color: '#666',
-    marginTop: '5px'
-  },
-  viewBtn: {
-    padding: '8px 15px',
-    backgroundColor: '#007bff',
-    color: 'white',
-    borderRadius: '5px',
     fontSize: '14px'
   },
-  modal: {
+  viewBtn: {
+    padding: '8px 16px',
+    backgroundColor: '#007bff',
+    color: 'white',
+    border: 'none',
+    borderRadius: '5px',
+    cursor: 'pointer',
+    fontSize: '14px'
+  },
+  modalOverlay: {
     position: 'fixed',
     top: 0,
     left: 0,
@@ -428,48 +447,58 @@ const styles = {
     bottom: 0,
     backgroundColor: 'rgba(0,0,0,0.7)',
     display: 'flex',
-    justifyContent: 'center',
     alignItems: 'center',
+    justifyContent: 'center',
     zIndex: 1000
   },
-  modalContent: {
+  modal: {
     backgroundColor: 'white',
-    padding: '30px',
     borderRadius: '10px',
-    maxWidth: '500px',
+    padding: '20px',
+    maxWidth: '600px',
     width: '90%',
     maxHeight: '80vh',
-    overflow: 'auto'
+    overflow: 'auto',
+    position: 'relative'
   },
   modalHeader: {
     display: 'flex',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: '10px'
+    marginBottom: '20px',
+    paddingBottom: '10px',
+    borderBottom: '1px solid #eee'
   },
   modalTitle: {
     margin: 0,
+    fontSize: '18px',
     color: '#333'
   },
-  modalPhone: {
-    fontSize: '14px',
-    color: '#666',
-    marginBottom: '20px'
-  },
   countdown: {
-    fontSize: '24px',
+    fontSize: '18px',
     fontWeight: 'bold',
     color: '#dc3545'
   },
-  messageBody: {
-    fontSize: '18px',
-    lineHeight: '1.6',
-    color: '#333',
-    padding: '20px',
-    backgroundColor: '#f8f9fa',
-    borderRadius: '8px',
+  modalBody: {
     marginBottom: '20px',
     minHeight: '100px'
+  },
+  messageText: {
+    fontSize: '16px',
+    lineHeight: '1.5',
+    color: '#333',
+    whiteSpace: 'pre-wrap',
+    wordBreak: 'break-word'
+  },
+  modalFooter: {
+    textAlign: 'center',
+    paddingTop: '10px',
+    borderTop: '1px solid #eee',
+    marginBottom: '15px'
+  },
+  messageTime: {
+    color: '#999',
+    fontSize: '12px'
   },
   closeBtn: {
     width: '100%',
@@ -479,8 +508,71 @@ const styles = {
     border: 'none',
     borderRadius: '5px',
     cursor: 'pointer',
+    fontSize: '16px',
+    fontWeight: 'bold'
+  },
+  // Media-specific styles
+  mediaContainer: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '15px',
+    alignItems: 'center'
+  },
+  image: {
+    maxWidth: '100%',
+    maxHeight: '400px',
+    borderRadius: '8px',
+    objectFit: 'contain'
+  },
+  video: {
+    maxWidth: '100%',
+    maxHeight: '400px',
+    borderRadius: '8px'
+  },
+  audio: {
+    width: '100%',
+    maxWidth: '400px'
+  },
+  mediaCaption: {
+    fontSize: '14px',
+    color: '#666',
+    textAlign: 'center',
+    fontStyle: 'italic',
+    marginTop: '10px'
+  },
+  fileInfo: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '15px',
+    padding: '15px',
+    backgroundColor: '#f8f9fa',
+    borderRadius: '8px',
+    width: '100%'
+  },
+  fileIcon: {
+    fontSize: '40px'
+  },
+  fileName: {
+    fontSize: '16px',
     fontWeight: 'bold',
-    fontSize: '16px'
+    color: '#333',
+    wordBreak: 'break-word'
+  },
+  fileSize: {
+    fontSize: '12px',
+    color: '#999',
+    marginTop: '4px'
+  },
+  downloadBtn: {
+    padding: '10px 20px',
+    backgroundColor: '#007bff',
+    color: 'white',
+    textDecoration: 'none',
+    borderRadius: '5px',
+    fontSize: '14px',
+    fontWeight: 'bold',
+    textAlign: 'center',
+    display: 'inline-block'
   }
 };
 

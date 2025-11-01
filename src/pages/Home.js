@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { connectSocket, disconnectSocket } from '../services/socket';
@@ -12,6 +12,23 @@ function Home() {
   const [messages, setMessages] = useState([]);
   const [viewingMessage, setViewingMessage] = useState(null);
   const [countdown, setCountdown] = useState(15);
+  
+  // File upload states
+  const [selectedFile, setSelectedFile] = useState(null);
+  const [filePreview, setFilePreview] = useState(null);
+  const [uploading, setUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
+  
+  // Voice recording states
+  const [isRecording, setIsRecording] = useState(false);
+  const [recordingTime, setRecordingTime] = useState(0);
+  const [audioBlob, setAudioBlob] = useState(null);
+  const [audioURL, setAudioURL] = useState(null);
+  
+  const fileInputRef = useRef(null);
+  const mediaRecorderRef = useRef(null);
+  const audioChunksRef = useRef([]);
+  const recordingTimerRef = useRef(null);
   
   const user = JSON.parse(localStorage.getItem('user') || '{}');
   const token = localStorage.getItem('token');
@@ -65,6 +82,163 @@ function Home() {
     navigate('/login');
   };
 
+  // Start voice recording
+  const startRecording = async () => {
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      
+      const mediaRecorder = new MediaRecorder(stream);
+      mediaRecorderRef.current = mediaRecorder;
+      audioChunksRef.current = [];
+      
+      mediaRecorder.ondataavailable = (event) => {
+        if (event.data.size > 0) {
+          audioChunksRef.current.push(event.data);
+        }
+      };
+      
+      mediaRecorder.onstop = () => {
+        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/webm' });
+        const audioUrl = URL.createObjectURL(audioBlob);
+        
+        setAudioBlob(audioBlob);
+        setAudioURL(audioUrl);
+        
+        // Stop all tracks
+        stream.getTracks().forEach(track => track.stop());
+      };
+      
+      mediaRecorder.start();
+      setIsRecording(true);
+      setRecordingTime(0);
+      setError('');
+      
+      // Start timer
+      recordingTimerRef.current = setInterval(() => {
+        setRecordingTime(prev => {
+          if (prev >= 60) { // Max 60 seconds
+            stopRecording();
+            return 60;
+          }
+          return prev + 1;
+        });
+      }, 1000);
+      
+    } catch (err) {
+      setError('Microphone access denied or not available');
+      console.error('Recording error:', err);
+    }
+  };
+
+  // Stop voice recording
+  const stopRecording = () => {
+    if (mediaRecorderRef.current && isRecording) {
+      mediaRecorderRef.current.stop();
+      setIsRecording(false);
+      
+      if (recordingTimerRef.current) {
+        clearInterval(recordingTimerRef.current);
+      }
+    }
+  };
+
+  // Clear recorded audio
+  const clearRecording = () => {
+    setAudioBlob(null);
+    setAudioURL(null);
+    setRecordingTime(0);
+    if (audioURL) {
+      URL.revokeObjectURL(audioURL);
+    }
+  };
+
+  // Handle file selection
+  const handleFileSelect = (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    // Clear any existing recording
+    clearRecording();
+
+    // Validate file size (max 50MB)
+    if (file.size > 50 * 1024 * 1024) {
+      setError('File size must be less than 50MB');
+      return;
+    }
+
+    setSelectedFile(file);
+    setError('');
+
+    // Create preview for images
+    if (file.type.startsWith('image/')) {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        setFilePreview({
+          type: 'image',
+          url: e.target.result,
+          name: file.name
+        });
+      };
+      reader.readAsDataURL(file);
+    } else if (file.type.startsWith('video/')) {
+      setFilePreview({
+        type: 'video',
+        name: file.name,
+        size: (file.size / 1024 / 1024).toFixed(2) + ' MB'
+      });
+    } else if (file.type.startsWith('audio/')) {
+      setFilePreview({
+        type: 'audio',
+        name: file.name,
+        size: (file.size / 1024 / 1024).toFixed(2) + ' MB'
+      });
+    } else {
+      setFilePreview({
+        type: 'file',
+        name: file.name,
+        size: (file.size / 1024 / 1024).toFixed(2) + ' MB'
+      });
+    }
+  };
+
+  // Clear selected file
+  const clearFile = () => {
+    setSelectedFile(null);
+    setFilePreview(null);
+    if (fileInputRef.current) {
+      fileInputRef.current.value = '';
+    }
+  };
+
+  // Upload file to S3
+  const uploadFileToS3 = async (file) => {
+    const formData = new FormData();
+    formData.append('file', file);
+
+    try {
+      const response = await axios.post(
+        'http://localhost:3001/api/media/upload',
+        formData,
+        {
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'multipart/form-data'
+          },
+          onUploadProgress: (progressEvent) => {
+            const percentCompleted = Math.round(
+              (progressEvent.loaded * 100) / progressEvent.total
+            );
+            setUploadProgress(percentCompleted);
+          }
+        }
+      );
+
+      return response.data.data;
+    } catch (err) {
+      throw new Error(err.response?.data?.error || 'Upload failed');
+    }
+  };
+
   const handleSendMessage = async (e) => {
     e.preventDefault();
     setError('');
@@ -72,19 +246,73 @@ function Home() {
     setLoading(true);
 
     try {
+      let messageData = {
+        receiver_phone: receiver,
+      };
+
+      // If voice recording exists, upload it first
+      if (audioBlob) {
+        setUploading(true);
+        
+        // Convert blob to file
+        const audioFile = new File([audioBlob], `voice_${Date.now()}.webm`, {
+          type: 'audio/webm'
+        });
+        
+        const uploadResult = await uploadFileToS3(audioFile);
+        
+        messageData.message_type = 'audio';
+        messageData.media_url = uploadResult.media_url;
+        messageData.file_name = uploadResult.file_name;
+        messageData.file_size = uploadResult.file_size;
+        
+        // Add text as caption if provided
+        if (message.trim()) {
+          messageData.text = message;
+        }
+      }
+      // If file is selected, upload it
+      else if (selectedFile) {
+        setUploading(true);
+        const uploadResult = await uploadFileToS3(selectedFile);
+        
+        messageData.message_type = uploadResult.message_type;
+        messageData.media_url = uploadResult.media_url;
+        messageData.file_name = uploadResult.file_name;
+        messageData.file_size = uploadResult.file_size;
+        
+        // Add text as caption if provided
+        if (message.trim()) {
+          messageData.text = message;
+        }
+      } else {
+        // Text-only message
+        if (!message.trim()) {
+          setError('Please enter a message, record voice, or select a file');
+          setLoading(false);
+          return;
+        }
+        messageData.text = message;
+      }
+
+      // Send message
       await axios.post(
         'http://localhost:3001/api/messages/send',
-        { receiver_username: receiver, text: message },
+        messageData,
         { headers: { 'Authorization': `Bearer ${token}` } }
       );
 
-      setSuccess('Message sent!');
+      setSuccess(audioBlob ? 'Voice message sent!' : selectedFile ? 'Media sent!' : 'Message sent!');
       setReceiver('');
       setMessage('');
+      clearFile();
+      clearRecording();
+      setUploadProgress(0);
     } catch (err) {
-      setError(err.response?.data?.error || 'Failed to send');
+      setError(err.message || err.response?.data?.error || 'Failed to send');
     } finally {
       setLoading(false);
+      setUploading(false);
     }
   };
 
@@ -97,6 +325,13 @@ function Home() {
       setMessages(prev => prev.filter(m => m.message_id !== viewingMessage.message_id));
       setViewingMessage(null);
     }
+  };
+
+  // Helper function to format recording time
+  const formatTime = (seconds) => {
+    const mins = Math.floor(seconds / 60);
+    const secs = seconds % 60;
+    return `${mins}:${secs.toString().padStart(2, '0')}`;
   };
 
   // Helper function to get message preview based on type
@@ -123,7 +358,7 @@ function Home() {
         <div style={styles.mediaContainer}>
           <img 
             src={msg.media_url} 
-            alt="Shared image" 
+            alt="Shared content" 
             style={styles.image}
           />
           {msg.text && <p style={styles.mediaCaption}>{msg.text}</p>}
@@ -199,7 +434,10 @@ function Home() {
     <div style={styles.container}>
       {/* Header */}
       <div style={styles.header}>
-        <h1 style={styles.title}>📨 Welcome, {user.username}!</h1>
+        <div>
+          <h1 style={styles.title}>📨 Welcome, {user.username}!</h1>
+          <p style={styles.subtitle}>Your number: {user.phone}</p>
+        </div>
         <button onClick={handleLogout} style={styles.logoutBtn}>
           Logout
         </button>
@@ -211,29 +449,159 @@ function Home() {
         <form onSubmit={handleSendMessage} style={styles.form}>
           <input
             type="text"
-            placeholder="Receiver username"
+            placeholder="Receiver's Phone Number (+919142945779)"
             value={receiver}
             onChange={(e) => setReceiver(e.target.value)}
             required
             style={styles.input}
           />
+          
           <textarea
-            placeholder="Type your message..."
+            placeholder="Type your message... (optional if you attach media)"
             value={message}
             onChange={(e) => setMessage(e.target.value)}
-            required
             rows="3"
             style={styles.textarea}
           />
+
+          {/* Recording UI */}
+          {isRecording && (
+            <div style={styles.recordingContainer}>
+              <div style={styles.recordingIndicator}>
+                <span style={styles.recordingDot}>🔴</span>
+                <span style={styles.recordingText}>Recording... {formatTime(recordingTime)}</span>
+              </div>
+              <button 
+                type="button" 
+                onClick={stopRecording} 
+                style={styles.stopBtn}
+              >
+                ⏹️ Stop
+              </button>
+            </div>
+          )}
+
+          {/* Recorded Audio Preview */}
+          {audioURL && !isRecording && (
+            <div style={styles.filePreviewContainer}>
+              <div style={styles.audioPreview}>
+                <span style={styles.audioIcon}>🎤</span>
+                <div style={styles.audioInfo}>
+                  <div style={styles.audioTitle}>Voice Message</div>
+                  <div style={styles.audioDuration}>{formatTime(recordingTime)}</div>
+                  <audio src={audioURL} controls style={styles.audioPlayer} />
+                </div>
+                <button 
+                  type="button" 
+                  onClick={clearRecording} 
+                  style={styles.removeFileBtn}
+                >
+                  ❌ Remove
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* File Preview */}
+          {filePreview && !audioURL && (
+            <div style={styles.filePreviewContainer}>
+              {filePreview.type === 'image' ? (
+                <div style={styles.imagePreview}>
+                  <img src={filePreview.url} alt="Preview" style={styles.previewImage} />
+                  <div style={styles.previewInfo}>
+                    <span style={styles.previewFileName}>{filePreview.name}</span>
+                    <button 
+                      type="button" 
+                      onClick={clearFile} 
+                      style={styles.removeFileBtn}
+                    >
+                      ❌ Remove
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div style={styles.filePreviewInfo}>
+                  <div style={styles.filePreviewIcon}>
+                    {filePreview.type === 'video' && '🎥'}
+                    {filePreview.type === 'audio' && '🎵'}
+                    {filePreview.type === 'file' && '📎'}
+                  </div>
+                  <div style={styles.filePreviewDetails}>
+                    <div style={styles.previewFileName}>{filePreview.name}</div>
+                    <div style={styles.previewFileSize}>{filePreview.size}</div>
+                  </div>
+                  <button 
+                    type="button" 
+                    onClick={clearFile} 
+                    style={styles.removeFileBtn}
+                  >
+                    ❌ Remove
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
+
+          {/* Upload Progress */}
+          {uploading && (
+            <div style={styles.progressContainer}>
+              <div style={styles.progressBar}>
+                <div 
+                  style={{...styles.progressFill, width: `${uploadProgress}%`}}
+                />
+              </div>
+              <span style={styles.progressText}>{uploadProgress}%</span>
+            </div>
+          )}
+
+          {/* Buttons Row */}
+          <div style={styles.buttonRow}>
+            {!isRecording && !audioURL && (
+              <button 
+                type="button"
+                onClick={startRecording}
+                style={styles.recordBtn}
+                disabled={loading || !!selectedFile}
+              >
+                🎤 Record Voice
+              </button>
+            )}
+            
+            {!audioURL && (
+              <>
+                <input
+                  type="file"
+                  ref={fileInputRef}
+                  onChange={handleFileSelect}
+                  style={styles.hiddenInput}
+                  accept="image/*,video/*,audio/*,.pdf,.doc,.docx,.txt"
+                />
+                <button 
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  style={styles.attachBtn}
+                  disabled={loading || isRecording}
+                >
+                  📎 Attach File
+                </button>
+              </>
+            )}
+            
+            <button 
+              type="submit" 
+              disabled={loading || uploading || isRecording} 
+              style={styles.sendBtn}
+            >
+              {loading ? 'Sending...' : uploading ? 'Uploading...' : 'Send Message'}
+            </button>
+          </div>
+
           {error && <p style={styles.error}>{error}</p>}
           {success && <p style={styles.success}>{success}</p>}
-          <button type="submit" disabled={loading} style={styles.sendBtn}>
-            {loading ? 'Sending...' : 'Send Message'}
-          </button>
         </form>
       </div>
 
-      {/* Received Messages - Chat List */}
+      {/* Received Messages */}
       <div style={styles.card}>
         <h2 style={styles.sectionTitle}>
           📬 Messages ({messages.length})
@@ -319,6 +687,11 @@ const styles = {
     fontSize: '24px',
     margin: 0
   },
+  subtitle: {
+    color: '#666',
+    fontSize: '14px',
+    margin: '5px 0 0 0'
+  },
   logoutBtn: {
     padding: '10px 20px',
     backgroundColor: '#dc3545',
@@ -359,6 +732,47 @@ const styles = {
     resize: 'vertical',
     fontFamily: 'Arial, sans-serif'
   },
+  buttonRow: {
+    display: 'flex',
+    gap: '10px',
+    flexWrap: 'wrap'
+  },
+  hiddenInput: {
+    display: 'none'
+  },
+  recordBtn: {
+    padding: '12px 20px',
+    backgroundColor: '#dc3545',
+    color: 'white',
+    border: 'none',
+    borderRadius: '5px',
+    cursor: 'pointer',
+    fontSize: '14px',
+    fontWeight: 'bold',
+    flex: '0 0 auto'
+  },
+  attachBtn: {
+    padding: '12px 20px',
+    backgroundColor: '#6c757d',
+    color: 'white',
+    border: 'none',
+    borderRadius: '5px',
+    cursor: 'pointer',
+    fontSize: '14px',
+    fontWeight: 'bold',
+    flex: '0 0 auto'
+  },
+  sendBtn: {
+    padding: '12px',
+    backgroundColor: '#007bff',
+    color: 'white',
+    border: 'none',
+    borderRadius: '5px',
+    cursor: 'pointer',
+    fontSize: '16px',
+    fontWeight: 'bold',
+    flex: 1
+  },
   error: {
     color: '#dc3545',
     margin: 0,
@@ -369,15 +783,142 @@ const styles = {
     margin: 0,
     fontSize: '14px'
   },
-  sendBtn: {
-    padding: '12px',
-    backgroundColor: '#007bff',
+  // Recording UI
+  recordingContainer: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: '15px',
+    backgroundColor: '#fff3cd',
+    borderRadius: '8px',
+    border: '2px solid #ffc107'
+  },
+  recordingIndicator: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '10px'
+  },
+  recordingDot: {
+    fontSize: '20px',
+    animation: 'pulse 1s infinite'
+  },
+  recordingText: {
+    fontSize: '16px',
+    fontWeight: 'bold',
+    color: '#333'
+  },
+  stopBtn: {
+    padding: '8px 16px',
+    backgroundColor: '#dc3545',
     color: 'white',
     border: 'none',
     borderRadius: '5px',
     cursor: 'pointer',
-    fontSize: '16px',
+    fontSize: '14px',
     fontWeight: 'bold'
+  },
+  // Audio Preview
+  audioPreview: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '15px'
+  },
+  audioIcon: {
+    fontSize: '40px'
+  },
+  audioInfo: {
+    flex: 1
+  },
+  audioTitle: {
+    fontWeight: 'bold',
+    fontSize: '14px',
+    color: '#333',
+    marginBottom: '4px'
+  },
+  audioDuration: {
+    fontSize: '12px',
+    color: '#666',
+    marginBottom: '8px'
+  },
+  audioPlayer: {
+    width: '100%',
+    maxWidth: '300px'
+  },
+  // File Preview
+  filePreviewContainer: {
+    border: '2px solid #007bff',
+    borderRadius: '8px',
+    padding: '15px',
+    backgroundColor: '#f8f9fa'
+  },
+  imagePreview: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '10px'
+  },
+  previewImage: {
+    maxWidth: '200px',
+    maxHeight: '200px',
+    borderRadius: '8px',
+    objectFit: 'cover'
+  },
+  previewInfo: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center'
+  },
+  filePreviewInfo: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '15px'
+  },
+  filePreviewIcon: {
+    fontSize: '40px'
+  },
+  filePreviewDetails: {
+    flex: 1
+  },
+  previewFileName: {
+    fontWeight: 'bold',
+    fontSize: '14px',
+    color: '#333',
+    wordBreak: 'break-word'
+  },
+  previewFileSize: {
+    fontSize: '12px',
+    color: '#666',
+    marginTop: '4px'
+  },
+  removeFileBtn: {
+    padding: '6px 12px',
+    backgroundColor: '#dc3545',
+    color: 'white',
+    border: 'none',
+    borderRadius: '5px',
+    cursor: 'pointer',
+    fontSize: '12px'
+  },
+  progressContainer: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '10px'
+  },
+  progressBar: {
+    flex: 1,
+    height: '20px',
+    backgroundColor: '#e9ecef',
+    borderRadius: '10px',
+    overflow: 'hidden'
+  },
+  progressFill: {
+    height: '100%',
+    backgroundColor: '#007bff',
+    transition: 'width 0.3s ease'
+  },
+  progressText: {
+    fontSize: '14px',
+    fontWeight: 'bold',
+    color: '#007bff'
   },
   noMessages: {
     textAlign: 'center',
@@ -395,9 +936,7 @@ const styles = {
     alignItems: 'center',
     padding: '15px',
     backgroundColor: '#f8f9fa',
-    borderRadius: '8px',
-    cursor: 'pointer',
-    transition: 'background-color 0.2s'
+    borderRadius: '8px'
   },
   chatInfo: {
     display: 'flex',
@@ -458,8 +997,7 @@ const styles = {
     maxWidth: '600px',
     width: '90%',
     maxHeight: '80vh',
-    overflow: 'auto',
-    position: 'relative'
+    overflow: 'auto'
   },
   modalHeader: {
     display: 'flex',
@@ -511,7 +1049,6 @@ const styles = {
     fontSize: '16px',
     fontWeight: 'bold'
   },
-  // Media-specific styles
   mediaContainer: {
     display: 'flex',
     flexDirection: 'column',

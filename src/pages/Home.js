@@ -432,15 +432,20 @@ function Home() {
 
   return (
     <div style={styles.container}>
-      {/* Header */}
+      {/* Header - UPDATED WITH GROUPS BUTTON */}
       <div style={styles.header}>
         <div>
           <h1 style={styles.title}>📨 Welcome, {user.username}!</h1>
           <p style={styles.subtitle}>Your number: {user.phone}</p>
         </div>
-        <button onClick={handleLogout} style={styles.logoutBtn}>
-          Logout
-        </button>
+        <div style={styles.headerButtons}>
+          <button onClick={() => navigate('/groups')} style={styles.groupsButton}>
+            👥 Groups
+          </button>
+          <button onClick={handleLogout} style={styles.logoutBtn}>
+            Logout
+          </button>
+        </div>
       </div>
 
       {/* Send Message */}
@@ -691,6 +696,20 @@ const styles = {
     color: '#666',
     fontSize: '14px',
     margin: '5px 0 0 0'
+  },
+  headerButtons: {  // NEW
+    display: 'flex',
+    gap: '10px'
+  },
+  groupsButton: {  // NEW
+    padding: '10px 20px',
+    backgroundColor: '#28a745',
+    color: 'white',
+    border: 'none',
+    borderRadius: '8px',
+    cursor: 'pointer',
+    fontWeight: 'bold',
+    fontSize: '16px'
   },
   logoutBtn: {
     padding: '10px 20px',

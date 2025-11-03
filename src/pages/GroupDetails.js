@@ -14,7 +14,6 @@ function GroupDetails() {
   const [showAddMember, setShowAddMember] = useState(false);
   
   const user = JSON.parse(localStorage.getItem('user') || '{}');
-  const token = localStorage.getItem('token');
 
   // Fetch group details
   useEffect(() => {
@@ -22,8 +21,13 @@ function GroupDetails() {
       try {
         setLoading(true);
         const data = await getGroupDetails(groupId);
+        
+        console.log('📋 Group details loaded:', data);
+        
+        // Backend now returns members as separate array
         setGroupInfo(data.group);
-        setMembers(data.group.members || []);
+        setMembers(data.members || []);
+        
       } catch (err) {
         setError('Failed to load group details');
         console.error('Fetch details error:', err);
@@ -38,7 +42,7 @@ function GroupDetails() {
   }, [groupId]);
 
   // Check if current user is admin
-  const isAdmin = members.find(m => m.user_id === user.id)?.role === 'admin';
+  const isAdmin = members.find(m => m.user_id === user.id || m.id === user.id)?.role === 'admin';
 
   // Add member
   const handleAddMember = async (e) => {
@@ -58,12 +62,12 @@ function GroupDetails() {
     setError('');
 
     try {
-      const response = await addGroupMember(groupId, addMemberPhone);
+      await addGroupMember(groupId, addMemberPhone);
       
       // Refresh group details
       const data = await getGroupDetails(groupId);
       setGroupInfo(data.group);
-      setMembers(data.group.members || []);
+      setMembers(data.members || []);
       
       setAddMemberPhone('');
       setShowAddMember(false);
@@ -176,14 +180,14 @@ function GroupDetails() {
               {/* Members List */}
               <div style={styles.membersList}>
                 {members.map((member) => (
-                  <div key={member.user_id} style={styles.memberItem}>
+                  <div key={member.user_id || member.id} style={styles.memberItem}>
                     <div style={styles.memberAvatar}>
                       {member.username.charAt(0).toUpperCase()}
                     </div>
                     <div style={styles.memberInfo}>
                       <div style={styles.memberName}>
                         {member.username}
-                        {member.user_id === user.id && (
+                        {(member.user_id === user.id || member.id === user.id) && (
                           <span style={styles.youBadge}>(You)</span>
                         )}
                       </div>

@@ -79,11 +79,14 @@ function Login() {
   return (
     <div style={styles.container}>
       <div style={styles.card}>
-        <h1 style={styles.title}>📨 Snap - Login</h1>
+        <div style={styles.header}>
+          <h1 style={styles.title}>👻 Snap</h1>
+          <p style={styles.subtitle}>Enter as your ghost identity</p>
+        </div>
         
         <form onSubmit={handleSubmit} style={styles.form}>
           <div style={styles.inputGroup}>
-            <label style={styles.label}>Phone Number</label>
+            <label style={styles.label}>📱 Phone Number</label>
             <input
               type="tel"
               name="phone"
@@ -100,7 +103,7 @@ function Login() {
           </div>
           
           <div style={styles.inputGroup}>
-            <label style={styles.label}>Password</label>
+            <label style={styles.label}>🔒 Password</label>
             <input
               type="password"
               name="password"
@@ -115,12 +118,12 @@ function Login() {
           {error && <p style={styles.error}>{error}</p>}
           
           <button type="submit" disabled={loading} style={styles.button}>
-            {loading ? 'Logging in...' : 'Login'}
+            {loading ? 'Entering...' : '👻 Enter as Ghost'}
           </button>
         </form>
         
         <p style={styles.link}>
-          Don't have an account? <a href="/register">Register here</a>
+          Don't have an account? <a href="/register" style={styles.linkText}>Create Ghost Identity</a>
         </p>
       </div>
     </div>
@@ -133,70 +136,96 @@ const styles = {
     justifyContent: 'center',
     alignItems: 'center',
     minHeight: '100vh',
-    backgroundColor: '#f0f2f5',
-    fontFamily: 'Arial, sans-serif'
+    backgroundColor: '#0f0f23',
+    fontFamily: 'Arial, sans-serif',
+    backgroundImage: 'radial-gradient(circle at 20% 50%, rgba(120, 119, 198, 0.1), transparent 50%), radial-gradient(circle at 80% 80%, rgba(120, 119, 198, 0.1), transparent 50%)'
   },
   card: {
-    backgroundColor: 'white',
+    backgroundColor: '#1a1a2e',
     padding: '40px',
-    borderRadius: '10px',
-    boxShadow: '0 2px 10px rgba(0,0,0,0.1)',
+    borderRadius: '15px',
+    boxShadow: '0 8px 32px rgba(120, 119, 198, 0.2)',
     width: '100%',
-    maxWidth: '400px'
+    maxWidth: '400px',
+    border: '1px solid rgba(120, 119, 198, 0.2)'
+  },
+  header: {
+    textAlign: 'center',
+    marginBottom: '30px'
   },
   title: {
-    textAlign: 'center',
-    marginBottom: '30px',
-    color: '#333'
+    margin: 0,
+    marginBottom: '8px',
+    color: '#fff',
+    fontSize: '32px',
+    fontWeight: '700'
+  },
+  subtitle: {
+    margin: 0,
+    color: '#a0a0c0',
+    fontSize: '14px'
   },
   form: {
     display: 'flex',
     flexDirection: 'column',
-    gap: '15px'
+    gap: '20px'
   },
   inputGroup: {
     display: 'flex',
     flexDirection: 'column',
-    gap: '5px'
+    gap: '8px'
   },
   label: {
     fontSize: '14px',
     fontWeight: '600',
-    color: '#555'
+    color: '#7877c6'
   },
   input: {
-    padding: '12px',
+    padding: '14px',
     fontSize: '16px',
-    border: '1px solid #ddd',
-    borderRadius: '5px',
-    outline: 'none'
+    border: '1px solid rgba(120, 119, 198, 0.3)',
+    borderRadius: '8px',
+    outline: 'none',
+    backgroundColor: '#16213e',
+    color: '#fff',
+    transition: 'border-color 0.3s'
   },
   hint: {
     fontSize: '12px',
-    color: '#888',
+    color: '#a0a0c0',
     marginTop: '2px'
   },
   button: {
-    padding: '12px',
+    padding: '14px',
     fontSize: '16px',
-    backgroundColor: '#007bff',
+    backgroundColor: '#7877c6',
     color: 'white',
     border: 'none',
-    borderRadius: '5px',
+    borderRadius: '8px',
     cursor: 'pointer',
     fontWeight: 'bold',
-    marginTop: '10px'
+    marginTop: '10px',
+    transition: 'background-color 0.3s'
   },
   error: {
-    color: 'red',
+    color: '#ff6b6b',
     fontSize: '14px',
     textAlign: 'center',
-    margin: '10px 0'
+    margin: 0,
+    backgroundColor: 'rgba(255, 107, 107, 0.1)',
+    padding: '12px',
+    borderRadius: '8px'
   },
   link: {
     textAlign: 'center',
-    marginTop: '20px',
-    fontSize: '14px'
+    marginTop: '24px',
+    fontSize: '14px',
+    color: '#a0a0c0'
+  },
+  linkText: {
+    color: '#7877c6',
+    textDecoration: 'none',
+    fontWeight: '600'
   }
 };
 

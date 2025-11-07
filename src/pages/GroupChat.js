@@ -8,6 +8,7 @@ import {
   getGroupDetails 
 } from '../services/groupAPI';
 import { connectSocket, disconnectSocket } from '../services/socket';
+import './GroupChat.css'; // We'll create this
 
 function GroupChat() {
   const { groupId } = useParams();
@@ -189,46 +190,63 @@ function GroupChat() {
   };
 
   return (
-    <div style={styles.container}>
-      {/* Header */}
-      <div style={styles.header}>
-        <button onClick={() => navigate('/groups')} style={styles.backButton}>
-          ← Back
-        </button>
-        <div style={styles.headerInfo}>
-          <h2 style={styles.groupName}>
-            {groupInfo?.name || 'Loading...'}
-          </h2>
-          <p style={styles.memberCount}>
-            👥 {groupInfo?.member_count || 0} members
-          </p>
-        </div>
-        <button 
-  onClick={() => navigate(`/group/${groupId}/details`)} 
-  style={styles.detailsButton}
->
-  ⋮
-</button>
+    <div className="group-chat-container">
+      {/* Animated Background */}
+      <div className="chat-background">
+        <div className="chat-orb orb-1"></div>
+        <div className="chat-orb orb-2"></div>
       </div>
 
+      {/* Header */}
+      <header className="chat-header">
+        <button onClick={() => navigate('/groups')} className="chat-back-btn">
+          <span className="back-arrow">←</span>
+        </button>
+        
+        <div className="chat-header-info">
+          <div className="group-avatar">
+            <span className="avatar-icon">👥</span>
+          </div>
+          <div className="group-details">
+            <h2 className="chat-group-name">
+              {groupInfo?.name || 'Loading...'}
+            </h2>
+            <p className="chat-member-count">
+              <span className="online-dot"></span>
+              {groupInfo?.member_count || 0} members
+            </p>
+          </div>
+        </div>
+
+        <button 
+          onClick={() => navigate(`/group/${groupId}/details`)} 
+          className="chat-menu-btn"
+        >
+          <span className="menu-dots">⋮</span>
+        </button>
+      </header>
+
       {/* Messages Container */}
-      <div style={styles.messagesContainer} onScroll={handleScroll}>
+      <div className="chat-messages-container" onScroll={handleScroll}>
         {loading && (
-          <div style={styles.loadingContainer}>
-            <p style={styles.loadingText}>Loading messages...</p>
+          <div className="chat-loading">
+            <div className="chat-spinner"></div>
+            <p className="chat-loading-text">Loading messages...</p>
           </div>
         )}
 
         {!loading && messages.length === 0 && (
-          <div style={styles.emptyContainer}>
-            <p style={styles.emptyIcon}>💬</p>
-            <p style={styles.emptyText}>No messages yet</p>
-            <p style={styles.emptySubtext}>Be the first to send a message!</p>
+          <div className="chat-empty">
+            <div className="empty-icon-box">
+              <span className="chat-empty-icon">💬</span>
+            </div>
+            <h3 className="chat-empty-title">No messages yet</h3>
+            <p className="chat-empty-subtitle">Be the first to send a message!</p>
           </div>
         )}
 
         {!loading && messages.length > 0 && (
-          <div style={styles.messagesList}>
+          <div className="messages-list">
             {messages.map((msg, index) => {
               const isOwnMessage = msg.sender_id === user.id;
               const showUnreadDivider = index === firstUnreadIndex && unreadMessages.length > 0;
@@ -237,42 +255,32 @@ function GroupChat() {
                 <React.Fragment key={msg.id}>
                   {/* Unread Messages Divider */}
                   {showUnreadDivider && (
-                    <div ref={unreadDividerRef} style={styles.unreadDivider}>
-                      <div style={styles.unreadLine}></div>
-                      <span style={styles.unreadText}>
-                        {unreadMessages.length} unread message{unreadMessages.length > 1 ? 's' : ''}
+                    <div ref={unreadDividerRef} className="unread-divider">
+                      <div className="unread-line"></div>
+                      <span className="unread-badge">
+                        {unreadMessages.length} new message{unreadMessages.length > 1 ? 's' : ''}
                       </span>
-                      <div style={styles.unreadLine}></div>
+                      <div className="unread-line"></div>
                     </div>
                   )}
                   
                   {/* Message Bubble */}
-                  <div
-                    style={{
-                      ...styles.messageWrapper,
-                      justifyContent: isOwnMessage ? 'flex-end' : 'flex-start'
-                    }}
-                  >
-                    <div
-                      style={{
-                        ...styles.messageBubble,
-                        backgroundColor: isOwnMessage ? '#007bff' : 'white',
-                        color: isOwnMessage ? 'white' : '#333',
-                        alignSelf: isOwnMessage ? 'flex-end' : 'flex-start'
-                      }}
-                    >
+                  <div className={`message-row ${isOwnMessage ? 'own-message' : 'other-message'}`}>
+                    {!isOwnMessage && (
+                      <div className="message-avatar">
+                        <span className="avatar-letter">{msg.sender_name?.[0]?.toUpperCase() || '👻'}</span>
+                      </div>
+                    )}
+                    
+                    <div className={`message-bubble ${isOwnMessage ? 'bubble-own' : 'bubble-other'}`}>
                       {!isOwnMessage && (
-                        <p style={styles.senderName}>{msg.sender_name}</p>
+                        <p className="message-sender">{msg.sender_name}</p>
                       )}
-                      <p style={styles.messageText}>{msg.text}</p>
-                      <p
-                        style={{
-                          ...styles.messageTime,
-                          color: isOwnMessage ? 'rgba(255,255,255,0.7)' : '#999'
-                        }}
-                      >
-                        {formatTime(msg.created_at)}
-                      </p>
+                      <p className="message-text">{msg.text}</p>
+                      <div className="message-footer">
+                        <span className="message-time">{formatTime(msg.created_at)}</span>
+                        {isOwnMessage && <span className="message-status">✓</span>}
+                      </div>
                     </div>
                   </div>
                 </React.Fragment>
@@ -283,250 +291,50 @@ function GroupChat() {
         )}
       </div>
 
+      {/* Unread Banner */}
+      {unreadMessages.length > 0 && (
+        <div className="unread-float-banner" onClick={scrollToUnread}>
+          <span className="banner-text">
+            ↓ {unreadMessages.length} new message{unreadMessages.length > 1 ? 's' : ''}
+          </span>
+        </div>
+      )}
+
       {/* Input Area */}
-      <div style={styles.inputContainer}>
-        {error && <p style={styles.error}>{error}</p>}
-        
-        {/* Show unread count badge */}
-        {unreadMessages.length > 0 && (
-          <div style={styles.unreadBanner} onClick={scrollToUnread}>
-            <span style={styles.unreadBannerText}>
-              ↓ {unreadMessages.length} new message{unreadMessages.length > 1 ? 's' : ''}
-            </span>
+      <div className="chat-input-area">
+        {error && (
+          <div className="input-error">
+            <span className="error-icon">⚠️</span>
+            {error}
           </div>
         )}
         
-        <form onSubmit={handleSendMessage} style={styles.inputForm}>
-          <input
-            type="text"
-            value={newMessage}
-            onChange={(e) => setNewMessage(e.target.value)}
-            placeholder="Type a message..."
-            style={styles.input}
-            disabled={sending}
-          />
-          <button
-            type="submit"
-            disabled={sending || !newMessage.trim()}
-            style={{
-              ...styles.sendButton,
-              opacity: sending || !newMessage.trim() ? 0.5 : 1,
-              cursor: sending || !newMessage.trim() ? 'not-allowed' : 'pointer'
-            }}
-          >
-            {sending ? '⏳' : '📤'}
-          </button>
+        <form onSubmit={handleSendMessage} className="input-form">
+          <div className="input-wrapper">
+            <input
+              type="text"
+              value={newMessage}
+              onChange={(e) => setNewMessage(e.target.value)}
+              placeholder="Type your message..."
+              className="message-input"
+              disabled={sending}
+            />
+            <button
+              type="submit"
+              disabled={sending || !newMessage.trim()}
+              className={`send-btn ${(sending || !newMessage.trim()) ? 'disabled' : ''}`}
+            >
+              {sending ? (
+                <span className="sending-icon">⏳</span>
+              ) : (
+                <span className="send-icon">📤</span>
+              )}
+            </button>
+          </div>
         </form>
       </div>
     </div>
   );
 }
-
-const styles = {
-  container: {
-    display: 'flex',
-    flexDirection: 'column',
-    height: '100vh',
-    backgroundColor: '#f3f4f6'
-  },
-  header: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: '16px 20px',
-    backgroundColor: 'white',
-    borderBottom: '1px solid #e5e7eb',
-    flexShrink: 0
-  },
-  backButton: {
-    padding: '8px 16px',
-    backgroundColor: 'transparent',
-    color: '#007bff',
-    border: 'none',
-    borderRadius: '8px',
-    fontSize: '16px',
-    cursor: 'pointer',
-    fontWeight: '500'
-  },
-  headerInfo: {
-    textAlign: 'center',
-    flex: 1
-  },
-  groupName: {
-    fontSize: '20px',
-    fontWeight: '700',
-    color: '#1f2937',
-    margin: 0
-  },
-  memberCount: {
-    fontSize: '13px',
-    color: '#6b7280',
-    margin: '4px 0 0 0'
-  },
-  messagesContainer: {
-    flex: 1,
-    overflowY: 'auto',
-    padding: '20px',
-    display: 'flex',
-    flexDirection: 'column'
-  },
-  loadingContainer: {
-    display: 'flex',
-    justifyContent: 'center',
-    alignItems: 'center',
-    height: '100%'
-  },
-  loadingText: {
-    fontSize: '16px',
-    color: '#6b7280'
-  },
-  emptyContainer: {
-    display: 'flex',
-    flexDirection: 'column',
-    justifyContent: 'center',
-    alignItems: 'center',
-    height: '100%',
-    textAlign: 'center'
-  },
-  emptyIcon: {
-    fontSize: '64px',
-    margin: 0
-  },
-  emptyText: {
-    fontSize: '20px',
-    fontWeight: '600',
-    color: '#374151',
-    margin: '16px 0 8px 0'
-  },
-  emptySubtext: {
-    fontSize: '14px',
-    color: '#9ca3af',
-    margin: 0
-  },
-  messagesList: {
-    display: 'flex',
-    flexDirection: 'column',
-    gap: '12px'
-  },
-  unreadDivider: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '12px',
-    margin: '20px 0',
-    padding: '0 16px'
-  },
-  unreadLine: {
-    flex: 1,
-    height: '2px',
-    backgroundColor: '#ef4444'
-  },
-  unreadText: {
-    fontSize: '13px',
-    fontWeight: '600',
-    color: '#ef4444',
-    textTransform: 'uppercase',
-    whiteSpace: 'nowrap'
-  },
-  messageWrapper: {
-    display: 'flex',
-    width: '100%'
-  },
-
-  detailsButton: {
-  padding: '8px 16px',
-  backgroundColor: 'transparent',
-  color: '#007bff',
-  border: 'none',
-  borderRadius: '8px',
-  fontSize: '24px',
-  cursor: 'pointer',
-  fontWeight: 'bold'
-},
-
-
-  messageBubble: {
-    maxWidth: '70%',
-    padding: '12px 16px',
-    borderRadius: '16px',
-    boxShadow: '0 1px 2px rgba(0,0,0,0.1)',
-    wordWrap: 'break-word'
-  },
-  senderName: {
-    fontSize: '12px',
-    fontWeight: '600',
-    color: '#007bff',
-    margin: '0 0 4px 0'
-  },
-  messageText: {
-    fontSize: '15px',
-    lineHeight: '1.4',
-    margin: '0 0 4px 0',
-    whiteSpace: 'pre-wrap'
-  },
-  messageTime: {
-    fontSize: '11px',
-    margin: 0
-  },
-  inputContainer: {
-    padding: '16px',
-    backgroundColor: 'white',
-    borderTop: '1px solid #e5e7eb',
-    flexShrink: 0,
-    position: 'relative'
-  },
-  unreadBanner: {
-    position: 'absolute',
-    top: '-40px',
-    left: '50%',
-    transform: 'translateX(-50%)',
-    backgroundColor: '#ef4444',
-    color: 'white',
-    padding: '8px 20px',
-    borderRadius: '20px',
-    fontSize: '14px',
-    fontWeight: '600',
-    cursor: 'pointer',
-    boxShadow: '0 4px 12px rgba(239,68,68,0.4)',
-    zIndex: 10,
-    animation: 'bounce 2s infinite'
-  },
-  unreadBannerText: {
-    display: 'flex',
-    alignItems: 'center',
-    gap: '6px'
-  },
-  error: {
-    color: '#ef4444',
-    fontSize: '14px',
-    margin: '0 0 8px 0',
-    textAlign: 'center'
-  },
-  inputForm: {
-    display: 'flex',
-    gap: '8px'
-  },
-  input: {
-    flex: 1,
-    padding: '12px 16px',
-    fontSize: '15px',
-    border: '1px solid #d1d5db',
-    borderRadius: '24px',
-    outline: 'none'
-  },
-  sendButton: {
-    width: '48px',
-    height: '48px',
-    backgroundColor: '#007bff',
-    color: 'white',
-    border: 'none',
-    borderRadius: '50%',
-    fontSize: '20px',
-    cursor: 'pointer',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    flexShrink: 0
-  }
-};
 
 export default GroupChat;

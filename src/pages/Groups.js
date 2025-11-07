@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { getUserGroups } from '../services/groupAPI';
 import GroupCard from '../components/GroupCard';
 import EmptyState from '../components/EmptyState';
+import './Groups.css'; // We'll create this
 
 function Groups() {
   const [groups, setGroups] = useState([]);
@@ -37,134 +38,86 @@ function Groups() {
   };
 
   return (
-    <div style={styles.container}>
-      {/* Header */}
-      <div style={styles.header}>
-        <button onClick={handleBack} style={styles.backButton}>
-          ← Back
-        </button>
-        <h1 style={styles.title}>Groups</h1>
-        <button onClick={handleCreateGroup} style={styles.createButton}>
-          + New
-        </button>
+    <div className="groups-container">
+      {/* Animated Background */}
+      <div className="groups-background">
+        <div className="gradient-orb orb-1"></div>
+        <div className="gradient-orb orb-2"></div>
+        <div className="gradient-orb orb-3"></div>
       </div>
 
+      {/* Header */}
+      <header className="groups-header">
+        <button onClick={handleBack} className="back-btn">
+          <span className="back-icon">←</span>
+          <span className="back-text">Back</span>
+        </button>
+        
+        <div className="header-center">
+          <h1 className="groups-title">
+            <span className="title-icon">👥</span>
+            Groups
+          </h1>
+          <p className="groups-subtitle">{groups.length} group{groups.length !== 1 ? 's' : ''}</p>
+        </div>
+
+        <button onClick={handleCreateGroup} className="create-btn">
+          <span className="create-icon">+</span>
+          <span className="create-text">New Group</span>
+        </button>
+      </header>
+
       {/* Content */}
-      <div style={styles.content}>
+      <main className="groups-content">
         {loading && (
-          <div style={styles.loadingContainer}>
-            <p style={styles.loadingText}>Loading groups...</p>
+          <div className="loading-state">
+            <div className="loading-spinner"></div>
+            <p className="loading-text">Loading your groups...</p>
           </div>
         )}
 
         {!loading && error && (
-          <div style={styles.errorContainer}>
-            <p style={styles.errorText}>❌ {error}</p>
-            <button onClick={fetchGroups} style={styles.retryButton}>
-              Retry
+          <div className="error-state">
+            <div className="error-icon">⚠️</div>
+            <p className="error-text">{error}</p>
+            <button onClick={fetchGroups} className="retry-btn">
+              <span>🔄</span> Try Again
             </button>
           </div>
         )}
 
         {!loading && !error && groups.length === 0 && (
-          <EmptyState
-            icon="👥"
-            title="No groups yet"
-            message="Create a group to start chatting with multiple people at once!"
-            actionLabel="Create Group"
-            onAction={handleCreateGroup}
-          />
+          <div className="empty-state">
+            <div className="empty-icon-wrapper">
+              <span className="empty-icon">👥</span>
+            </div>
+            <h2 className="empty-title">No groups yet</h2>
+            <p className="empty-subtitle">
+              Create your first group to start chatting<br />
+              with multiple people anonymously!
+            </p>
+            <button onClick={handleCreateGroup} className="empty-action-btn">
+              <span>✨</span> Create Your First Group
+            </button>
+          </div>
         )}
 
         {!loading && !error && groups.length > 0 && (
-          <div style={styles.groupsList}>
-            {groups.map((group) => (
-              <GroupCard key={group.id} group={group} />
+          <div className="groups-grid">
+            {groups.map((group, index) => (
+              <div 
+                key={group.id} 
+                className="group-card-wrapper"
+                style={{ animationDelay: `${index * 0.1}s` }}
+              >
+                <GroupCard group={group} />
+              </div>
             ))}
           </div>
         )}
-      </div>
+      </main>
     </div>
   );
 }
-
-const styles = {
-  container: {
-    minHeight: '100vh',
-    backgroundColor: '#f3f4f6'
-  },
-  header: {
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: '16px 20px',
-    backgroundColor: 'white',
-    borderBottom: '1px solid #e5e7eb',
-    position: 'sticky',
-    top: 0,
-    zIndex: 10
-  },
-  backButton: {
-    padding: '8px 16px',
-    backgroundColor: 'transparent',
-    color: '#007bff',
-    border: 'none',
-    borderRadius: '8px',
-    fontSize: '16px',
-    cursor: 'pointer',
-    fontWeight: '500'
-  },
-  title: {
-    fontSize: '24px',
-    fontWeight: '700',
-    color: '#1f2937',
-    margin: 0
-  },
-  createButton: {
-    padding: '8px 16px',
-    backgroundColor: '#007bff',
-    color: 'white',
-    border: 'none',
-    borderRadius: '8px',
-    fontSize: '16px',
-    fontWeight: '600',
-    cursor: 'pointer'
-  },
-  content: {
-    padding: '20px',
-    maxWidth: '800px',
-    margin: '0 auto'
-  },
-  loadingContainer: {
-    textAlign: 'center',
-    padding: '60px 20px'
-  },
-  loadingText: {
-    fontSize: '16px',
-    color: '#6b7280'
-  },
-  errorContainer: {
-    textAlign: 'center',
-    padding: '60px 20px'
-  },
-  errorText: {
-    fontSize: '16px',
-    color: '#ef4444',
-    marginBottom: '20px'
-  },
-  retryButton: {
-    padding: '10px 20px',
-    backgroundColor: '#007bff',
-    color: 'white',
-    border: 'none',
-    borderRadius: '8px',
-    fontSize: '16px',
-    cursor: 'pointer'
-  },
-  groupsList: {
-    display: 'flex',
-    flexDirection: 'column'
-  }
-};
 
 export default Groups;

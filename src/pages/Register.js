@@ -72,7 +72,7 @@ function Register() {
     }
 
     try {
-      const response = await axios.post('http://localhost:3001/api/auth/register', formData);
+      const response = await axios.post(`${process.env.REACT_APP_API_URL || 'http://localhost:3001'}/api/auth/register`, formData);
       
       // Store token in localStorage
       localStorage.setItem('token', response.data.token);

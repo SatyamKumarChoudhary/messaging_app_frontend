@@ -1,6 +1,6 @@
 import axios from 'axios';
 
-const API_URL = 'http://localhost:3001/api/profile';
+const API_URL = `${process.env.REACT_APP_API_URL || 'http://localhost:3001'}/api/profile`;
 
 // Get auth token from localStorage
 const getAuthHeader = () => {

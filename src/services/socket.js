@@ -7,7 +7,7 @@ export const connectSocket = (token) => {
   if (socket) return socket;
   
   // Connect to backend server
-  socket = io('http://localhost:3001', {
+  socket = io(process.env.REACT_APP_SOCKET_URL || 'http://localhost:3001', {
     auth: { token }
   });
   

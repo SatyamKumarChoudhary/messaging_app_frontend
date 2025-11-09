@@ -213,11 +213,11 @@ function Home() {
 
     try {
       const response = await axios.post(
-        'http://localhost:3001/api/media/upload',
-        formData,
-        {
-          headers: {
-            'Authorization': `Bearer ${token}`,
+  `${process.env.REACT_APP_API_URL || 'http://localhost:3001'}/api/media/upload`,
+  formData,
+  {
+    headers: {
+      'Authorization': `Bearer ${token}`,
             'Content-Type': 'multipart/form-data'
           },
           onUploadProgress: (progressEvent) => {
@@ -285,12 +285,11 @@ function Home() {
         messageData.text = message;
       }
 
-      await axios.post(
-        'http://localhost:3001/api/messages/send',
-        messageData,
-        { headers: { 'Authorization': `Bearer ${token}` } }
-      );
-
+     await axios.post(
+  `${process.env.REACT_APP_API_URL || 'http://localhost:3001'}/api/messages/send`,
+  messageData,
+  { headers: { 'Authorization': `Bearer ${token}` } }
+);
       setSuccess(audioBlob ? 'Voice message sent!' : selectedFile ? 'Media sent!' : 'Message sent!');
       setReceiver('');
       setMessage('');

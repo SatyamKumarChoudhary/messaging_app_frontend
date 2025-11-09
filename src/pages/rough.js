@@ -217,7 +217,7 @@ function Home() {
 
     try {
       const response = await axios.post(
-        'http://localhost:3001/api/media/upload',
+        `${process.env.REACT_APP_API_URL || 'http://localhost:3001'}/api/media/upload`,
         formData,
         {
           headers: {
@@ -297,7 +297,7 @@ function Home() {
 
       // Send message
       await axios.post(
-        'http://localhost:3001/api/messages/send',
+        `${process.env.REACT_APP_API_URL || 'http://localhost:3001'}/api/messages/send`,
         messageData,
         { headers: { 'Authorization': `Bearer ${token}` } }
       );

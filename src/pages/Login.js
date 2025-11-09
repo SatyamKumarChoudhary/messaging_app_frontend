@@ -58,7 +58,7 @@ function Login() {
     }
 
     try {
-      const response = await axios.post('http://localhost:3001/api/auth/login', {
+      const response = await axios.post(`${process.env.REACT_APP_API_URL || 'http://localhost:3001'}/api/auth/login`, {
         phone: formData.phone,
         password: formData.password
       });

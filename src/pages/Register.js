@@ -8,7 +8,8 @@ function Register() {
     email: '',
     phone: '',
     password: '',
-    ghost_name: ''  // ← NEW FIELD
+    ghost_name: '',
+    bio: ''  // ← ADDED
   });
   const [error, setError] = useState('');
   const [loading, setLoading] = useState(false);
@@ -160,6 +161,23 @@ function Register() {
               ⚠️ This is your permanent anonymous identity. Choose wisely!
             </p>
           </div>
+
+          {/* BIO SECTION - NEW */}
+          <div style={styles.inputGroup}>
+            <label style={styles.label}>Bio (Optional)</label>
+            <textarea
+              name="bio"
+              placeholder="Tell others about yourself... (optional)"
+              value={formData.bio}
+              onChange={handleChange}
+              style={{...styles.input, ...styles.textarea}}
+              maxLength={200}
+              rows={3}
+            />
+            <small style={styles.charCount}>
+              {formData.bio.length}/200 characters
+            </small>
+          </div>
           
           <div style={styles.inputGroup}>
             <label style={styles.label}>Password</label>
@@ -250,6 +268,18 @@ const styles = {
     backgroundColor: '#16213e',
     color: '#fff',
     transition: 'border-color 0.3s'
+  },
+  textarea: {  // ← NEW
+    minHeight: '80px',
+    resize: 'vertical',
+    fontFamily: 'Arial, sans-serif',
+    lineHeight: '1.5'
+  },
+  charCount: {  // ← NEW
+    fontSize: '11px',
+    color: '#a0a0c0',
+    textAlign: 'right',
+    marginTop: '2px'
   },
   ghostSection: {
     display: 'flex',

@@ -6,7 +6,8 @@ import Home from './pages/Home';
 import Groups from './pages/Groups';
 import CreateGroup from './pages/CreateGroup';
 import GroupChat from './pages/GroupChat';
-import GroupDetails from './pages/GroupDetails';  // NEW IMPORT
+import GroupDetails from './pages/GroupDetails';
+import Profile from './pages/Profile';  // 🆕 NEW IMPORT
 import ProtectedRoute from './components/ProtectedRoute';
 
 function App() {
@@ -54,12 +55,22 @@ function App() {
           } 
         />
 
-        {/* NEW: Group Details Route */}
+        {/* Group Details Route */}
         <Route 
           path="/group/:groupId/details" 
           element={
             <ProtectedRoute>
               <GroupDetails />
+            </ProtectedRoute>
+          } 
+        />
+
+        {/* 🆕 NEW: Profile Route */}
+        <Route 
+          path="/profile" 
+          element={
+            <ProtectedRoute>
+              <Profile />
             </ProtectedRoute>
           } 
         />

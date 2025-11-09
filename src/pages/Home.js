@@ -420,15 +420,19 @@ function Home() {
             </div>
           </div>
           <div className="header-actions">
-            <button onClick={() => navigate('/groups')} className="btn-groups">
-              <span className="btn-icon">👥</span>
-              <span className="btn-text">Groups</span>
-            </button>
-            <button onClick={handleLogout} className="btn-logout">
-              <span className="btn-icon">🚪</span>
-              <span className="btn-text">Logout</span>
-            </button>
-          </div>
+  <button onClick={() => navigate('/profile')} className="btn-profile">
+    <span className="btn-icon">👤</span>
+    <span className="btn-text">Profile</span>
+  </button>
+  <button onClick={() => navigate('/groups')} className="btn-groups">
+    <span className="btn-icon">👥</span>
+    <span className="btn-text">Groups</span>
+  </button>
+  <button onClick={handleLogout} className="btn-logout">
+    <span className="btn-icon">🚪</span>
+    <span className="btn-text">Logout</span>
+  </button>
+</div>
         </div>
       </header>
 

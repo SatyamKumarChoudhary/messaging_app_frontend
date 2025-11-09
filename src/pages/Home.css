@@ -1051,6 +1051,27 @@ body {
   .section-title {
     font-size: 18px;
   }
+
+  /* Profile Button */
+.btn-profile {
+  padding: 10px 20px;
+  background: linear-gradient(135deg, #7877c6, #9d50bb);
+  color: white;
+  border: none;
+  border-radius: 12px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  transition: all 0.3s ease;
+}
+
+.btn-profile:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 5px 20px rgba(120, 119, 198, 0.4);
+}
   
   .chat-item {
     padding: 10px;

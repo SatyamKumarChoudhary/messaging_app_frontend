@@ -10,6 +10,8 @@ import GroupDetails from './pages/GroupDetails';
 import Profile from './pages/Profile';  // 🆕 NEW IMPORT
 import ProtectedRoute from './components/ProtectedRoute';
 
+import OTPTest from './pages/OTPTest';
+
 function App() {
   return (
     <BrowserRouter>
@@ -64,6 +66,8 @@ function App() {
             </ProtectedRoute>
           } 
         />
+
+        <Route path="/otp-test" element={<OTPTest />} />
 
         {/* 🆕 NEW: Profile Route */}
         <Route 

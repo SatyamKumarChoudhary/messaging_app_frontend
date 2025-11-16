@@ -2,10 +2,15 @@ import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { connectSocket, disconnectSocket } from '../services/socket';
+import CountryCodeDropdown from '../components/CountryCodeDropdown';
 import './Home.css'; // New CSS file for animations
 
 function Home() {
-  const [receiver, setReceiver] = useState('');
+  // Country & Phone for receiver
+  const [selectedCountry, setSelectedCountry] = useState({ code: '+91', name: 'India', flag: '🇮🇳' });
+  const [receiverPhone, setReceiverPhone] = useState('');
+  const [receiver, setReceiver] = useState(''); // Full formatted number
+  
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
@@ -34,6 +39,15 @@ function Home() {
   const user = JSON.parse(localStorage.getItem('user') || '{}');
   const token = localStorage.getItem('token');
   const navigate = useNavigate();
+
+  // Auto-format full phone number when country or phone changes
+  useEffect(() => {
+    if (receiverPhone) {
+      setReceiver(selectedCountry.code + receiverPhone);
+    } else {
+      setReceiver('');
+    }
+  }, [selectedCountry, receiverPhone]);
 
   // Socket.io connection
   useEffect(() => {
@@ -213,11 +227,11 @@ function Home() {
 
     try {
       const response = await axios.post(
-  `${process.env.REACT_APP_API_URL || 'http://localhost:3001'}/api/media/upload`,
-  formData,
-  {
-    headers: {
-      'Authorization': `Bearer ${token}`,
+        `${process.env.REACT_APP_API_URL || 'http://localhost:3001'}/api/media/upload`,
+        formData,
+        {
+          headers: {
+            'Authorization': `Bearer ${token}`,
             'Content-Type': 'multipart/form-data'
           },
           onUploadProgress: (progressEvent) => {
@@ -285,12 +299,14 @@ function Home() {
         messageData.text = message;
       }
 
-     await axios.post(
-  `${process.env.REACT_APP_API_URL || 'http://localhost:3001'}/api/messages/send`,
-  messageData,
-  { headers: { 'Authorization': `Bearer ${token}` } }
-);
+      await axios.post(
+        `${process.env.REACT_APP_API_URL || 'http://localhost:3001'}/api/messages/send`,
+        messageData,
+        { headers: { 'Authorization': `Bearer ${token}` } }
+      );
+      
       setSuccess(audioBlob ? 'Voice message sent!' : selectedFile ? 'Media sent!' : 'Message sent!');
+      setReceiverPhone('');
       setReceiver('');
       setMessage('');
       clearFile();
@@ -419,19 +435,19 @@ function Home() {
             </div>
           </div>
           <div className="header-actions">
-  <button onClick={() => navigate('/profile')} className="btn-profile">
-    <span className="btn-icon">👤</span>
-    <span className="btn-text">Profile</span>
-  </button>
-  <button onClick={() => navigate('/groups')} className="btn-groups">
-    <span className="btn-icon">👥</span>
-    <span className="btn-text">Groups</span>
-  </button>
-  <button onClick={handleLogout} className="btn-logout">
-    <span className="btn-icon">🚪</span>
-    <span className="btn-text">Logout</span>
-  </button>
-</div>
+            <button onClick={() => navigate('/profile')} className="btn-profile">
+              <span className="btn-icon">👤</span>
+              <span className="btn-text">Profile</span>
+            </button>
+            <button onClick={() => navigate('/groups')} className="btn-groups">
+              <span className="btn-icon">👥</span>
+              <span className="btn-text">Groups</span>
+            </button>
+            <button onClick={handleLogout} className="btn-logout">
+              <span className="btn-icon">🚪</span>
+              <span className="btn-text">Logout</span>
+            </button>
+          </div>
         </div>
       </header>
 
@@ -449,17 +465,31 @@ function Home() {
           </div>
           
           <form onSubmit={handleSendMessage} className="modern-form">
-            <div className="form-row">
-              <div className="input-group">
-                <span className="input-icon">📱</span>
-                <input
-                  type="text"
-                  placeholder="Receiver's Phone (+919142945779)"
-                  value={receiver}
-                  onChange={(e) => setReceiver(e.target.value)}
-                  required
-                  className="modern-input"
+            {/* UPDATED: Phone Input with Country Code Dropdown */}
+            <div className="form-row phone-row">
+              <div className="country-selector">
+                <label className="phone-label">Country</label>
+                <CountryCodeDropdown
+                  value={selectedCountry}
+                  onChange={setSelectedCountry}
                 />
+              </div>
+              <div className="phone-input-wrapper">
+                <label className="phone-label">Receiver's Phone Number</label>
+                <div className="input-group">
+                  <span className="input-icon">📱</span>
+                  <input
+                    type="tel"
+                    placeholder="9142945779"
+                    value={receiverPhone}
+                    onChange={(e) => setReceiverPhone(e.target.value.replace(/\D/g, '').slice(0, 10))}
+                    required
+                    className="modern-input phone-number-input"
+                  />
+                </div>
+                <small className="phone-hint">
+                  Will send to: <strong>{receiver || `${selectedCountry.code} XXXXXXXXXX`}</strong>
+                </small>
               </div>
             </div>
 

@@ -3,7 +3,8 @@ import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import { connectSocket, disconnectSocket } from '../services/socket';
 import CountryCodeDropdown from '../components/CountryCodeDropdown';
-import './Home.css'; // New CSS file for animations
+import CallButton from '../components/CallButton'; // 📞 NEW: Import CallButton
+import './Home.css';
 
 function Home() {
   // Country & Phone for receiver
@@ -674,6 +675,11 @@ function Home() {
                       <div className="chat-name">{msg.sender_name}</div>
                       <div className="chat-preview">{getMessagePreview(msg)}</div>
                     </div>
+                    {/* 📞 NEW: Call Button - call back message sender */}
+                    <CallButton 
+                      targetGhostName={msg.sender_name} 
+                      size="small"
+                    />
                     <button 
                       onClick={() => openMessageViewer(msg)}
                       className="btn-view"
